@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dog — KolibriOS 在线体验</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='36' r='20' fill='%23f0c060'/%3E%3Cellipse cx='24' cy='30' rx='6' ry='5' fill='%23222'/%3E%3Cellipse cx='40' cy='30' rx='6' ry='5' fill='%23222'/%3E%3Cpath d='M27 44 q5 6 10 0 z' fill='%23222'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --line: #30363d;
+    --text: #e6edf3;
+    --dim: #8b949e;
+    --accent: #f0c060;
+    --ok: #3fb950;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  header { text-align: center; margin-bottom: 18px; }
+  h1 {
+    font-size: 34px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  header p { color: var(--dim); font-size: 14px; margin-top: 6px; }
+  .frame {
+    width: min(920px, 100%);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    background: #0d1117;
+    font-size: 13px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+  .dot.on { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  #status { color: var(--dim); flex: 1; }
+  .progress { height: 3px; background: var(--line); }
+  #bar { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #screen_container {
+    width: 100%;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 320px;
+  }
+  #screen_container canvas { display: block; max-width: 100%; height: auto; }
+  .actions { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button {
+    background: var(--accent);
+    color: #0d1117;
+    border: 0;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--line);
+  }
+  button:hover { filter: brightness(1.1); }
+  .hint { color: var(--dim); font-size: 12px; }
+  footer { color: var(--dim); font-size: 12px; margin-top: 16px; text-align: center; }
+  footer a { color: var(--accent); text-decoration: none; }
+  @media (max-width: 640px) {
+    h1 { font-size: 26px; }
+    body { padding: 14px 8px 28px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>dog</h1>
+  <p>KolibriOS 在线体验 · 基于 v86 模拟器 · 镜像来自本仓库 dog.img</p>
+</header>
+
+<div class="frame">
+  <div class="bar">
+    <span class="dot on" id="dot"></span>
+    <span id="status">正在加载模拟器…</span>
+    <span id="pct" class="hint"></span>
+  </div>
+  <div class="progress"><div id="bar"></div></div>
+  <div id="screen_container" tabindex="0"></div>
+  <div class="actions">
+    <button id="restart" class="secondary">重启系统</button>
+    <button id="fullscreen">全屏</button>
+    <span class="hint">点击屏幕后可使用键盘 / 鼠标操作（软驱 / 硬盘启动）</span>
+  </div>
+</div>
+
+<footer>
+  页面引导镜像：<a href="dog.img" target="_blank" rel="noopener">dog.img</a>（100 MB 原始镜像）
+  · 压缩版：<a href="dog.img.zst" target="_blank" rel="noopener">dog.img.zst</a>（约 1.4 MB）
+</footer>
+
+<script src="v86.js"></script>
+<script>
+(function () {
+  var statusEl = document.getElementById("status");
+  var barEl = document.getElementById("bar");
+  var pctEl = document.getElementById("pct");
+  var dotEl = document.getElementById("dot");
+  var emulator = null;
+
+  function setStatus(msg, ok) {
+    statusEl.textContent = msg;
+    if (ok) { dotEl.classList.add("on"); } else { dotEl.classList.remove("on"); }
+  }
+  function setPct(a, b) {
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= 0) { pctEl.textContent = ""; return; }
+    barEl.style.width = Math.min(100, (a / b) * 100) + "%";
+    pctEl.textContent = Math.round((a / b) * 100) + "%";
+  }
+
+  function boot() {
+    barEl.style.width = "0%";
+    pctEl.textContent = "";
+    setStatus("正在加载镜像（100 MB，首次稍慢）…", false);
+    emulator = new V86({
+      wasm_path: "v86.wasm",
+      memory_size: 256 * 1024 * 1024,
+      vga_memory_size: 16 * 1024 * 1024,
+      screen_container: document.getElementById("screen_container"),
+      bios: { url: "seabios.bin" },
+      vga_bios: { url: "vgabios.bin" },
+      hda: { url: "dog.img", async: true, size: 104857600 },
+      autostart: true
+    });
+    emulator.add_listener("emulator-ready", function () {
+      setStatus("模拟器就绪，正在启动 KolibriOS…", true);
+    });
+    emulator.add_listener("download-progress", function (e) {
+      if (e && e.total) { setPct(e.downloaded, e.total); }
+    });
+    emulator.add_listener("download-complete", function () {
+      setPct(100, 100);
+      setStatus("镜像加载完成，正在启动…", true);
+    });
+  }
+
+  document.getElementById("restart").addEventListener("click", function () {
+    if (emulator) { try { emulator.destroy(); } catch (err) {} }
+    var sc = document.getElementById("screen_container");
+    sc.innerHTML = "";
+    boot();
+  });
+
+  document.getElementById("fullscreen").addEventListener("click", function () {
+    var sc = document.getElementById("screen_container");
+    if (document.fullscreenElement) { document.exitFullscreen(); }
+    else if (sc.requestFullscreen) { sc.requestFullscreen(); }
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>
