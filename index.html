@@ -117,7 +117,7 @@
   <div class="actions">
     <button id="restart" class="secondary">重启系统</button>
     <button id="fullscreen">全屏</button>
-    <span class="hint" style="margin-left:auto;color:var(--dim);font-size:12px">镜像：dog.img（100 MB，边下边启动）</span>
+    <span class="hint" style="margin-left:auto;color:var(--dim);font-size:12px">镜像：dog.img.zst 分块（约 43 MB，边下边启动）</span>
   </div>
   <div class="tips">
     <b>鼠标：</b>点击屏幕后鼠标会进入虚拟机（屏幕上消失），按 <b>Ctrl + Alt</b> 即可释放鼠标。<br>
@@ -161,7 +161,7 @@
       screen_container: sc,
       bios: { url: "seabios.bin" },
       vga_bios: { url: "vgabios.bin" },
-      hda: { url: "dog.img", async: true, size: 104857600 },
+      hda: { url: "dog.img.zst", async: true, use_parts: true, fixed_chunk_size: 1048576, size: 104857600 },
       autostart: true
     });
     emulator.add_listener("emulator-ready", function () {
