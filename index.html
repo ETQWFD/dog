@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>dog — KolibriOS 在线体验</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='36' r='20' fill='%23f0c060'/%3E%3Cellipse cx='24' cy='30' rx='6' ry='5' fill='%23222'/%3E%3Cellipse cx='40' cy='30' rx='6' ry='5' fill='%23222'/%3E%3Cpath d='M27 44 q5 6 10 0 z' fill='%23222'/%3E%3C/svg%3E">
+<title>dog — Tiny Core 15.0 中文迷你系统 · 在线体验</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='36' r='20' fill='%2368c4ff'/%3E%3Cellipse cx='24' cy='30' rx='6' ry='5' fill='%23222'/%3E%3Cellipse cx='40' cy='30' rx='6' ry='5' fill='%23222'/%3E%3Cpath d='M27 44 q5 6 10 0 z' fill='%23222'/%3E%3C/svg%3E">
 <style>
   :root {
     --bg: #0d1117;
@@ -12,7 +12,7 @@
     --line: #30363d;
     --text: #e6edf3;
     --dim: #8b949e;
-    --accent: #f0c060;
+    --accent: #68c4ff;
     --ok: #3fb950;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -81,7 +81,16 @@
     border: 1px solid var(--line);
   }
   button:hover { filter: brightness(1.1); }
-  .hint { color: var(--dim); font-size: 12px; }
+  .tips {
+    padding: 12px 14px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--dim);
+    line-height: 1.9;
+    background: #0d1117;
+  }
+  .tips b { color: var(--accent); }
+  .tips code { color: var(--ok); }
   footer { color: var(--dim); font-size: 12px; margin-top: 16px; text-align: center; }
   footer a { color: var(--accent); text-decoration: none; }
   @media (max-width: 640px) {
@@ -94,12 +103,12 @@
 
 <header>
   <h1>dog</h1>
-  <p>KolibriOS 在线体验 · 基于 v86 模拟器 · 镜像来自本仓库 dog.img</p>
+  <p>Tiny Core Linux 15.0 中文迷你系统 · 在线体验 · 基于 v86 模拟器</p>
 </header>
 
 <div class="frame">
   <div class="bar">
-    <span class="dot on" id="dot"></span>
+    <span class="dot" id="dot"></span>
     <span id="status">正在加载模拟器…</span>
     <span id="pct" class="hint"></span>
   </div>
@@ -108,13 +117,17 @@
   <div class="actions">
     <button id="restart" class="secondary">重启系统</button>
     <button id="fullscreen">全屏</button>
-    <span class="hint">点击屏幕后可使用键盘 / 鼠标操作（软驱 / 硬盘启动）</span>
+    <span class="hint" style="margin-left:auto;color:var(--dim);font-size:12px">镜像：dog.img.zst（约 43 MB，边下边启动）</span>
+  </div>
+  <div class="tips">
+    <b>鼠标：</b>点击屏幕后鼠标会进入虚拟机（屏幕上消失），按 <b>Ctrl + Alt</b> 即可释放鼠标。<br>
+    <b>传文件：</b>把本机文件直接<b>拖进</b>黑色屏幕区域，会自动挂载为软驱 A:（在系统里执行 <code>mount /dev/fd0 /mnt</code> 后进入 /mnt 查看）。<br>
+    <b>说明：</b>系统为 Tiny Core Linux 15.0，中文 locale（zh_CN.UTF-8）+ 图形桌面（Xvesa + FLWM）+ 文泉驿中文字体，开机自动进入中文桌面。
   </div>
 </div>
 
 <footer>
-  页面引导镜像：<a href="dog.img" target="_blank" rel="noopener">dog.img</a>（100 MB 原始镜像）
-  · 压缩版：<a href="dog.img.zst" target="_blank" rel="noopener">dog.img.zst</a>（约 1.4 MB）
+  原始镜像：<a href="dog.img" target="_blank" rel="noopener">dog.img</a>（100 MB）· 压缩版：<a href="dog.img.zst" target="_blank" rel="noopener">dog.img.zst</a>（约 43 MB）
 </footer>
 
 <script src="v86.js"></script>
@@ -125,6 +138,7 @@
   var pctEl = document.getElementById("pct");
   var dotEl = document.getElementById("dot");
   var emulator = null;
+  var sc = document.getElementById("screen_container");
 
   function setStatus(msg, ok) {
     statusEl.textContent = msg;
@@ -139,40 +153,53 @@
   function boot() {
     barEl.style.width = "0%";
     pctEl.textContent = "";
-    setStatus("正在加载镜像（100 MB，首次稍慢）…", false);
+    setStatus("正在加载镜像（约 43 MB，首次稍慢）…", false);
     emulator = new V86({
       wasm_path: "v86.wasm",
       memory_size: 256 * 1024 * 1024,
       vga_memory_size: 16 * 1024 * 1024,
-      screen_container: document.getElementById("screen_container"),
+      screen_container: sc,
       bios: { url: "seabios.bin" },
       vga_bios: { url: "vgabios.bin" },
-      hda: { url: "dog.img", async: true, size: 104857600 },
+      hda: { url: "dog.img.zst", async: true, size: 104857600 },
       autostart: true
     });
     emulator.add_listener("emulator-ready", function () {
-      setStatus("模拟器就绪，正在启动 KolibriOS…", true);
+      setStatus("模拟器就绪，正在启动 Tiny Core 中文系统…", true);
     });
     emulator.add_listener("download-progress", function (e) {
       if (e && e.total) { setPct(e.downloaded, e.total); }
     });
     emulator.add_listener("download-complete", function () {
       setPct(100, 100);
-      setStatus("镜像加载完成，正在启动…", true);
+      setStatus("镜像加载完成，正在启动桌面…", true);
     });
   }
 
   document.getElementById("restart").addEventListener("click", function () {
     if (emulator) { try { emulator.destroy(); } catch (err) {} }
-    var sc = document.getElementById("screen_container");
     sc.innerHTML = "";
     boot();
   });
 
   document.getElementById("fullscreen").addEventListener("click", function () {
-    var sc = document.getElementById("screen_container");
     if (document.fullscreenElement) { document.exitFullscreen(); }
     else if (sc.requestFullscreen) { sc.requestFullscreen(); }
+  });
+
+  // 拖拽传文件：挂载为软驱 A:
+  sc.addEventListener("dragover", function (e) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+  sc.addEventListener("drop", function (e) {
+    e.preventDefault();
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f || !emulator) { return; }
+    var url = URL.createObjectURL(f);
+    try {
+      emulator.set_fda({ url: url, size: f.size });
+      setStatus("已挂载软驱 A: → " + f.name + "（系统内 mount /dev/fd0 /mnt 查看）", true);
+    } catch (err) {
+      setStatus("拖入文件失败：" + err.message, false);
+    }
   });
 
   boot();
